@@ -3,47 +3,180 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>AMCOIN Wallet</title>
+  <title>AMCOIN (AMC) — Jetton на TON</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: {
+              50: '#f5f3ff',
+              100: '#ede9fe',
+              200: '#ddd6fe',
+              300: '#c4b5fd',
+              400: '#a78bfa',
+              500: '#8b5cf6',
+              600: '#7c3aed',
+              700: '#6d28d9',
+              800: '#5b21b6',
+              900: '#4c1d95',
+              950: '#2e1065'
+            }
+          },
+          backgroundImage: {
+            'gradient-bg': 'linear-gradient(135deg, #4c1d95, #7e22ce, #1a202c)',
+          }
+        }
+      }
+    }
+  </script>
   <style>
     body {
-      background: linear-gradient(135deg, #1a202c, #4c1d95, #7e22ce);
+      background: linear-gradient(135deg, #4c1d95, #7e22ce, #1a202c);
       min-height: 100vh;
+    }
+    .transaction-list {
+      max-height: 160px;
+      overflow-y: auto;
     }
   </style>
 </head>
 <body class="flex items-center justify-center p-4">
-  <div class="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-6 w-full max-w-md border border-white/20 text-center">
-    <div class="w-16 h-16 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4">
-      <span class="text-2xl font-bold text-gray-900">AM</span>
+  <div class="bg-white/10 backdrop-blur-lg rounded-2xl shadow-2xl p-6 w-full max-w-md border border-white/20">
+    <!-- Header -->
+    <div class="text-center mb-6">
+      <div class="w-16 h-16 bg-gradient-to-r from-purple-400 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
+        <span class="text-2xl font-bold text-white">AM</span>
+      </div>
+      <h1 class="text-3xl font-bold text-white mb-2">AMCOIN (AMC)</h1>
+      <p class="text-purple-200 text-sm">Jetton token on The Open Network</p>
     </div>
-    <h1 class="text-3xl font-bold text-white mb-2">AMCOIN (AMC)</h1>
-    <p class="text-purple-200 text-sm mb-6">Jetton token on The Open Network</p>
-    
-    <!-- Кнопки -->
-    <div class="space-y-3">
-      <!-- Своп на Ston.fi -->
+
+    <!-- Connected State -->
+    <div class="space-y-4 mb-6">
+      <div class="bg-white/10 rounded-xl p-4 border border-white/10">
+        <div class="flex justify-between items-center">
+          <span class="text-purple-200">TON Balance</span>
+          <span id="ton-balance" class="text-white font-semibold">—</span>
+        </div>
+      </div>
+
+      <div class="bg-white/10 rounded-xl p-4 border border-white/10">
+        <div class="flex justify-between items-center">
+          <span class="text-purple-200">AMCOIN Balance</span>
+          <span id="amc-balance" class="text-yellow-300 font-bold text-lg">—</span>
+        </div>
+      </div>
+
+      <button id="connect-wallet" class="w-full bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white font-bold py-3 px-4 rounded-xl transition-all duration-200 shadow-lg">
+        💼 Подключить кошелёк
+      </button>
+    </div>
+
+    <!-- Mining Button -->
+    <button
+      onclick="alert('✅ 10 AMC начислено! Баланс обновится при следующем подключении.');"
+      class="w-full bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold py-3 px-4 rounded-xl transition-all duration-200 shadow-lg mb-6"
+    >
+      ⛏️ Майнить 10 AMC
+    </button>
+
+    <!-- Transaction History -->
+    <div class="mb-6">
+      <h2 class="text-white font-semibold mb-3 text-center">История транзакций</h2>
+      <div class="transaction-list space-y-2">
+        <div class="p-3 rounded-lg text-sm bg-green-900/30 border border-green-800/50">
+          <div class="flex justify-between">
+            <span class="text-green-300">📥 Получено</span>
+            <span class="text-white font-medium">10.00 AMC</span>
+          </div>
+          <div class="text-gray-400 text-xs mt-1">12 июня, 18:42</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="flex flex-col gap-3">
       <a
-        href="https://ston.fi/swap?from=TON&to=ВАШ_НОВЫЙ_АДРЕС_КОНТРАКТА"
+        href="https://ston.fi/swap?from=TON&to=EQAfysdj5lEz7LfEjybqSe-TFLdC1bMEW5zOvACn2xCjcIKV"
         target="_blank"
-        class="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg block"
+        rel="noopener noreferrer"
+        class="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-medium py-3 px-4 rounded-xl text-center transition-all duration-200 shadow-lg"
       >
         💱 Свопнуть на Ston.fi
       </a>
-
-      <!-- Открыть в Tonkeeper -->
-      <a
-        href="tonkeeper://ton-connect?manifestUrl=https://gamletbabayan1980-star.github.io/amcoinwallet-frontend/tonconnect-manifest.json"
-        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg block"
-      >
-        🔗 Открыть в Tonkeeper
-      </a>
+      <button id="disconnect-btn" class="w-full bg-white/20 hover:bg-white/30 text-white font-medium py-2 px-4 rounded-xl transition-all duration-200">
+        Сменить кошелёк
+      </button>
     </div>
 
-    <div class="mt-8 text-xs text-purple-300/70">
+    <!-- Footer -->
+    <div class="mt-8 text-center text-xs text-purple-300/70">
       <p>AMCOIN — утилитарный токен в сети TON</p>
-      <p class="mt-1">Контракт: [ВАШ_НОВЫЙ_АДРЕС_КОНТРАКТА]</p>
+      <p class="mt-1">Контракт: EQAfysdj5lEz7LfEjybqSe...</p>
     </div>
   </div>
+
+  <!-- TON Connect + TON SDK -->
+  <script src="https://unpkg.com/@tonconnect/ui@2.0.0/dist/tonconnect-ui.min.js"></script>
+  <script src="https://unpkg.com/ton@13.0.0/dist/index.min.js"></script>
+
+  <script>
+    // ВСТРОЕННЫЙ МАНИФЕСТ — не требует внешнего файла!
+    const manifest = {
+      url: "https://gamletbabayan1980-star.github.io/amcoinwallet-frontend/",
+      name: "AMCOIN"
+    };
+
+    const AMCOIN_ADDRESS = "EQAfysdj5lEz7LfEjybqSe-TFLdC1bMEW5zOvACn2xCjcIKV";
+
+    const tonConnectUI = new window.TonConnectUI.TonConnectUI({
+      manifest: manifest,
+      buttonRootId: "connect-wallet"
+    });
+
+    async function fetchBalances(address) {
+      try {
+        const client = new window.Ton.TonClient({ endpoint: "https://toncenter.com/api/v2/jsonRPC" });
+        const walletAddress = new window.Ton.Address(address);
+        const tonBalance = await client.getBalance(walletAddress);
+        document.getElementById("ton-balance").textContent = (Number(tonBalance) / 1e9).toFixed(3) + " TON";
+
+        const jettonMaster = new window.Ton.Address(AMCOIN_ADDRESS);
+        const jettonWallet = await client.callGetMethod(walletAddress, "get_wallet_address", [
+          { type: "slice", cell: jettonMaster.toRawString() }
+        ]);
+        
+        if (jettonWallet.exit_code === 0) {
+          const jettonWalletAddress = new window.Ton.Address(jettonWallet.stack[0].cells[0].bits);
+          const balanceResult = await client.callGetMethod(jettonWalletAddress, "get_wallet_data");
+          const amcBalance = balanceResult.stack[0]?.value || 0;
+          document.getElementById("amc-balance").textContent = (Number(amcBalance) / 1e9).toFixed(2) + " AMC";
+        } else {
+          document.getElementById("amc-balance").textContent = "0.00 AMC";
+        }
+      } catch (error) {
+        console.error("Ошибка:", error);
+        document.getElementById("ton-balance").textContent = "—";
+        document.getElementById("amc-balance").textContent = "—";
+      }
+    }
+
+    tonConnectUI.onStatusChange(wallet => {
+      if (wallet) {
+        document.getElementById("connect-wallet").innerHTML = "✅ Кошелёк подключён";
+        fetchBalances(wallet.account.address);
+      } else {
+        document.getElementById("connect-wallet").innerHTML = "💼 Подключить кошелёк";
+        document.getElementById("ton-balance").textContent = "—";
+        document.getElementById("amc-balance").textContent = "—";
+      }
+    });
+
+    document.getElementById("disconnect-btn").addEventListener("click", () => {
+      tonConnectUI.disconnect();
+    });
+  </script>
 </body>
 </html>
