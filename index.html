@@ -98,20 +98,6 @@
       ⛏️ Майнить 10 AMC
     </button>
 
-    <!-- Transaction History -->
-    <div class="mb-6">
-      <h2 class="text-white font-semibold mb-3 text-center">История транзакций</h2>
-      <div class="transaction-list space-y-2">
-        <div class="p-3 rounded-lg text-sm bg-green-900/30 border border-green-800/50">
-          <div class="flex justify-between">
-            <span class="text-green-300">📥 Получено</span>
-            <span class="text-white font-medium">10.00 AMC</span>
-          </div>
-          <div class="text-gray-400 text-xs mt-1">12 июня, 18:42</div>
-        </div>
-      </div>
-    </div>
-
     <!-- Action Buttons -->
     <div class="flex flex-col gap-3">
       <a
@@ -139,7 +125,6 @@
   <script src="https://unpkg.com/ton@13.0.0/dist/index.min.js"></script>
 
   <script>
-    // ВСТРОЕННЫЙ МАНИФЕСТ — не требует внешнего файла
     const manifest = {
       url: "https://gamletbabayan1980-star.github.io/amcoinwallet-frontend/",
       name: "AMCOIN"
@@ -194,7 +179,6 @@
       tonConnectUI.disconnect();
     });
 
-    // Проверка баланса по введённому адресу
     document.getElementById("check-address").addEventListener("click", async () => {
       const addressInput = document.getElementById("wallet-address");
       const address = addressInput.value.trim();
@@ -205,11 +189,10 @@
       }
       
       try {
-        new window.Ton.Address(address); // Валидация адреса
+        new window.Ton.Address(address);
         fetchBalances(address);
       } catch (error) {
         alert("Неверный формат адреса кошелька");
-        console.error("Invalid address:", error);
       }
     });
   </script>
