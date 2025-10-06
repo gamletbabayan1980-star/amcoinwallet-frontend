@@ -20,12 +20,11 @@
               600: '#7c3aed',
               700: '#6d28d9',
               800: '#5b21b6',
-              900: '#4c1d95',
-              950: '#2e1065'
+              900: '#4c1d95'
             }
           },
           backgroundImage: {
-            'gradient-bg': 'linear-gradient(135deg, #4c1d95, #7e22ce, #1a202c)',
+            'gradient-bg': 'linear-gradient(135deg, #4c1d95, #7e22ce, #2d1b69)',
           }
         }
       }
@@ -33,7 +32,7 @@
   </script>
   <style>
     body {
-      background: linear-gradient(135deg, #4c1d95, #7e22ce, #1a202c);
+      background: linear-gradient(135deg, #4c1d95, #7e22ce, #2d1b69);
       min-height: 100vh;
     }
     .transaction-list {
@@ -53,7 +52,7 @@
       <p class="text-purple-200 text-sm">Jetton token on The Open Network</p>
     </div>
 
-    <!-- Connected State -->
+    <!-- Balances -->
     <div class="space-y-4 mb-6">
       <div class="bg-white/10 rounded-xl p-4 border border-white/10">
         <div class="flex justify-between items-center">
@@ -74,7 +73,7 @@
       </button>
     </div>
 
-    <!-- Mining Button -->
+    <!-- Mining -->
     <button
       onclick="alert('✅ 10 AMC начислено! Баланс обновится при следующем подключении.');"
       class="w-full bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold py-3 px-4 rounded-xl transition-all duration-200 shadow-lg mb-6"
@@ -123,7 +122,7 @@
   <script src="https://unpkg.com/ton@13.0.0/dist/index.min.js"></script>
 
   <script>
-    // ВСТРОЕННЫЙ МАНИФЕСТ — не требует внешнего файла!
+    // ВСТРОЕННЫЙ МАНИФЕСТ — не требует внешнего файла
     const manifest = {
       url: "https://gamletbabayan1980-star.github.io/amcoinwallet-frontend/",
       name: "AMCOIN"
@@ -157,7 +156,7 @@
           document.getElementById("amc-balance").textContent = "0.00 AMC";
         }
       } catch (error) {
-        console.error("Ошибка:", error);
+        console.error("Ошибка при получении баланса:", error);
         document.getElementById("ton-balance").textContent = "—";
         document.getElementById("amc-balance").textContent = "—";
       }
