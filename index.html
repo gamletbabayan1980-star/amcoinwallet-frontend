@@ -56,6 +56,17 @@ code { background:#f7f7f7; padding:2px 6px; border-radius:4px; }
 </div>
 
 <div class="box">
+<h3>Отправка Amcoin (demo)</h3>
+<label>Получатель (TON address):</label>
+<input id="toAddress" placeholder="EQ... или 0:..." />
+<label>Сумма Amcoin (целые или дробные, в единицах токена):</label>
+<input id="amount" placeholder="Например 10" />
+<div style="margin-top:8px;">
+<button id="sendBtn">Отправить Amcoin</button>
+</div>
+</div>
+
+<div class="box">
 <h3>Логи</h3>
 <div id="log"></div>
 </div>
@@ -66,7 +77,7 @@ code { background:#f7f7f7; padding:2px 6px; border-radius:4px; }
 <script src="https://cdn.jsdelivr.net/npm/tonweb/dist/tonweb.min.js"></script>
 
 <script>
-(function(){
+(async function(){
 const logEl = document.getElementById('log');
 function log(...a){ const t=new Date().toLocaleString(); logEl.textContent += `[${t}] ` + a.join(' ') + "\n"; logEl.scrollTop = logEl.scrollHeight; console.log(...a); }
 function err(msg){ log("ERROR:", msg); console.error(msg); }
@@ -81,6 +92,9 @@ const tonAddressEl = document.getElementById('tonAddress');
 const tonBalEl = document.getElementById('tonBal');
 const tokenBalEl = document.getElementById('tokenBal');
 const refreshBtn = document.getElementById('refreshBtn');
+const sendBtn = document.getElementById('sendBtn');
+const toAddressEl = document.getElementById('toAddress');
+const amountEl = document.getElementById('amount');
 
 const state = { pubKeyHex:null, secretKeyUint8:null, tonAddress:null, tonweb:null, walletContract:null };
 const DEFAULT_RPC_TESTNET = "https://testnet.toncenter.com/api/v2/jsonRPC";
@@ -141,17 +155,13 @@ deriveBtn.addEventListener('click', async () => {
 });
 
 // обновление балансов
-async function fetchTonBalance(rpc, address){
-  try{
-    if(!address) return null;
-    const bal = await state.tonweb.provider.getBalance(address);
-    return bal.toString();
-  }catch(e){ err("fetchTonBalance: "+e); return null; }
+async function fetchTonBalance(address){
+  try{ return (await state.tonweb.provider.getBalance(address)).toString(); }
+  catch(e){ err("fetchTonBalance: "+e); return null; }
 }
 
-async function fetchAmcoinBalance(rpc, ownerAddr, amRoot){
+async function fetchAmcoinBalance(ownerAddr, amRoot){
   try{
-    if(!state.tonweb.token || !state.tonweb.token.jetton) return "0";
     const jm = new state.tonweb.token.jetton.JettonMaster({ address: amRoot, provider: state.tonweb.provider });
     const walletAddrObj = await jm.getWalletAddress(ownerAddr);
     const res = await state.tonweb.provider.callGetMethod(walletAddrObj, 'get_balance', []);
@@ -162,18 +172,39 @@ async function fetchAmcoinBalance(rpc, ownerAddr, amRoot){
 
 refreshBtn.addEventListener('click', async () => {
   if(!state.tonAddress){ err("Сначала сделайте derive."); return; }
-  const rpc = document.getElementById('rpcEndpoint').value || DEFAULT_RPC_TESTNET;
   const amRoot = document.getElementById('amcoinMaster').value || DEFAULT_AMMASTER;
-  tonBalEl.textContent = '...';
-  tokenBalEl.textContent = '...';
-  const tbal = await fetchTonBalance(rpc, state.tonAddress);
-  tonBalEl.textContent = tbal || '0';
-  const tb = await fetchAmcoinBalance(rpc, state.tonAddress, amRoot);
-  tokenBalEl.textContent = tb || '0';
+  tonBalEl.textContent = '...'; tokenBalEl.textContent = '...';
+  tonBalEl.textContent = await fetchTonBalance(state.tonAddress);
+  tokenBalEl.textContent = await fetchAmcoinBalance(state.tonAddress, amRoot);
   log("Балансы обновлены.");
 });
 
-log("Кошелёк загружен. Используйте testnet для тестирования.");
+// отправка Amcoin
+sendBtn.addEventListener('click', async () => {
+  try{
+    if(!state.secretKeyUint8 || !state.pubKeyHex || !state.tonAddress){ err("Сначала сделайте derive."); return; }
+    const to = toAddressEl.value.trim();
+    const amount = amountEl.value.trim();
+    const amRoot = document.getElementById('amcoinMaster').value || DEFAULT_AMMASTER;
+    if(!to || !amount){ err("Укажите получателя и сумму."); return; }
+    log(`Отправка ${amount} Amcoin на ${to}...`);
+
+    const jm = new state.tonweb.token.jetton.JettonMaster({ address: amRoot, provider: state.tonweb.provider });
+    const senderWalletObj = await jm.getWalletAddress(state.tonAddress);
+    const jw = new state.tonweb.token.jetton.JettonWallet({ address: senderWalletObj, provider: state.tonweb.provider });
+    const transferPayload = await jw.createTransfer({ toAddress: to, amount: amount, forwardAmount: 0, queryId: Date.now() });
+
+    const walletInstance = new TonWeb.wallet.all['v3R2']({ publicKey:'0x'+state.pubKeyHex });
+    const walletAddr = (await walletInstance.getAddress()).toString(true,true,true);
+    const seqno = await state.tonweb.provider.getSeqno(walletAddr);
+    const nativeAmountNano = TonWeb.utils.toNano('0.05');
+
+    await walletInstance.methods.transfer({ secretKey: state.secretKeyUint8, toAddress: senderWalletObj.toString(true,true,true), amount:nativeAmountNano, seqno, payload: transferPayload }).send();
+    log("Отправлено успешно.");
+  }catch(e){ err("send error: "+e); }
+});
+
+log("Кошелёк загружен. Используйте Testnet для тестирования.");
 })();
 </script>
 </body>
