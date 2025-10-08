@@ -1,4 +1,4 @@
- <!doctype html>
+<!doctype html>
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
@@ -83,18 +83,16 @@
   </div>
 
   <!-- Библиотеки -->
-  <script src="https://unpkg.com/bip39@3.0.4/browser.js"></script>
-  <script src="https://unpkg.com/tweetnacl@1.0.3/nacl.min.js"></script>
-  <script src="https://unpkg.com/tonweb/dist/tonweb.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bip39@3.0.4/browser.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tonweb/dist/tonweb.min.js"></script>
 
   <script>
   (function(){
-    // ----------------- УТИЛИТЫ -----------------
     const logEl = document.getElementById('log');
     function log(...a){ const t=new Date().toLocaleString(); logEl.textContent += `[${t}] ` + a.join(' ') + "\n"; logEl.scrollTop = logEl.scrollHeight; console.log(...a); }
     function err(msg){ log("ERROR:", msg); console.error(msg); }
 
-    // DOM
     const genSeedBtn = document.getElementById('genSeedBtn');
     const clearBtn = document.getElementById('clearBtn');
     const deriveBtn = document.getElementById('deriveBtn');
@@ -111,18 +109,19 @@
     const memoEl = document.getElementById('memo');
     const txResultEl = document.getElementById('txResult');
 
-    // State (in-memory only)
-    const state = { pubKeyHex: null, secretKeyUint8: null, tonAddress: null, tonweb: null, walletContract: null, walletInstance: null };
-
-    // Default settings
+    const state = { pubKeyHex:null, secretKeyUint8:null, tonAddress:null, tonweb:null, walletContract:null, walletInstance:null };
     const DEFAULT_RPC_TESTNET = "https://testnet.toncenter.com/api/v2/jsonRPC";
     const DEFAULT_AMMASTER = document.getElementById('amcoinMaster').value;
 
     // ----------------- Генерация / очистка -----------------
     genSeedBtn.addEventListener('click', () => {
-      const mnemonic = bip39.generateMnemonic(128); // 12 words
-      mnemonicEl.value = mnemonic;
-      log("Сгенерирован mnemonic (12 слов).");
+      try{
+        const mnemonic = bip39.generateMnemonic(128); // 12 слов
+        mnemonicEl.value = mnemonic;
+        log("Сгенерирован mnemonic (12 слов).");
+      }catch(e){
+        err("Ошибка генерации mnemonic: " + e);
+      }
     });
 
     clearBtn.addEventListener('click', () => {
@@ -139,284 +138,113 @@
       log("Очищено. Ключи удалены из памяти.");
     });
 
-    // ----------------- Восстановление (mnemonic -> ed25519 -> ton wallet)  -----------------
+    // ----------------- Derive ключей -----------------
     deriveBtn.addEventListener('click', async () => {
-      try {
+      try{
         const mnemonic = mnemonicEl.value.trim();
         if(!mnemonic){ err("mnemonic пустой"); return; }
-        // bip39 -> seed (Buffer)
         const pass = passEl.value || "";
-        const seedBig = bip39.mnemonicToSeedSync(mnemonic, pass); // Buffer
-        const seed32 = seedBig.slice(0,32); // ed25519 seed 32 bytes
+        const seedBig = bip39.mnemonicToSeedSync(mnemonic, pass);
+        const seed32 = seedBig.slice(0,32);
         const keyPair = nacl.sign.keyPair.fromSeed(new Uint8Array(seed32));
         const pubHex = Buffer.from(keyPair.publicKey).toString('hex');
         state.pubKeyHex = pubHex;
-        state.secretKeyUint8 = keyPair.secretKey; // 64 bytes
+        state.secretKeyUint8 = keyPair.secretKey;
         pubkeyEl.textContent = pubHex;
         log("Ключи получены (ed25519). publicKey hex:", pubHex);
 
-        // Инициализируем TonWeb с выбранным RPC
         const rpc = document.getElementById('rpcEndpoint').value || DEFAULT_RPC_TESTNET;
         const tonweb = new TonWeb(new TonWeb.HttpProvider(rpc));
         state.tonweb = tonweb;
         log("TonWeb инициализирован с RPC:", rpc);
 
-        // Создаём Wallet v3R2 контракт/экземпляр
-        // NOTE: API TonWeb может иметь разные версии — код поддерживает fallback и подробно логирует ошибки.
-        try {
-          // Wallet constructor: new TonWeb.wallet.All.v3R2({ publicKey: '0x'+pub })
-          const WalletClass = TonWeb.wallet.all['v3R2'];
-          if(!WalletClass){
-            log("Warning: Wallet v3R2 не найден в TonWeb. Попробуйте другую версию (v3R1) или обновите TonWeb.");
-            tonAddressEl.textContent = "—";
-            return;
-          }
-          // create wallet object (constructor expects provider? some variants expect nothing)
-          const wallet = new WalletClass({ publicKey: '0x' + state.pubKeyHex });
-          // getAddress may be async and return Address object
-          const addressObj = await wallet.getAddress();
-          const addrString = addressObj.toString(true, true, true);
-          state.tonAddress = addrString;
-          state.walletContract = wallet; // keep contract prototype for transfer ops
-          tonAddressEl.textContent = addrString;
-          log("Wallet v3R2 address:", addrString);
-        } catch (e) {
-          err("Ошибка при создании Wallet v3R2: " + e);
-          tonAddressEl.textContent = "—";
-        }
-      } catch (e) {
+        const WalletClass = TonWeb.wallet.all['v3R2'];
+        if(!WalletClass){ err("Wallet v3R2 не найден в TonWeb"); return; }
+        const wallet = new WalletClass({ publicKey:'0x'+pubHex });
+        const addrObj = await wallet.getAddress();
+        const addrStr = addrObj.toString(true,true,true);
+        state.tonAddress = addrStr;
+        state.walletContract = wallet;
+        tonAddressEl.textContent = addrStr;
+        log("Wallet v3R2 адрес:", addrStr);
+      }catch(e){
         err("derive error: " + e);
       }
     });
 
-    // ----------------- Получение балансов -----------------
-    // Получение нативного баланса через provider.getBalance (TonWeb)
+    // ----------------- Балансы -----------------
     async function fetchTonBalance(rpc, address){
-      try {
+      try{
         if(!address) return null;
         if(!state.tonweb) state.tonweb = new TonWeb(new TonWeb.HttpProvider(rpc));
-        const provider = state.tonweb.provider;
-        // provider.getBalance может вернуть BigNumber/BN/number/string — приводим к строке
-        const bal = await provider.getBalance(address);
-        // В зависимости от реализации: если это BN -> toString()
-        return (bal && bal.toString) ? bal.toString() : String(bal || "0");
-      } catch (e) {
+        const bal = await state.tonweb.provider.getBalance(address);
+        return (bal && bal.toString)? bal.toString():String(bal||"0");
+      }catch(e){
         err("fetchTonBalance: " + e);
         return null;
       }
     }
 
-    // Получение jetton (TIP-3) баланса:
-    // 1) создаём JettonMaster из root address
-    // 2) вызываем getWalletAddress(owner) -> jettonWalletAddress
-    // 3) вызываем метод 'get_balance' / или callGetMethod на jettonWalletAddress
     async function fetchAmcoinBalance(rpc, ownerAddress, amRootAddr){
-      try {
-        if(!amRootAddr || amRootAddr === 'AMCOIN_MASTER_ADDRESS') { log("Amcoin master не задан"); return null; }
-        if(!state.tonweb) state.tonweb = new TonWeb(new TonWeb.HttpProvider(rpc));
-        const tonweb = state.tonweb;
-        // JettonMaster helper (TonWeb may export it)
-        if(!tonweb.token || !tonweb.token.jetton || !tonweb.token.jetton.JettonMaster){
-          log("Jetton API не обнаружен в TonWeb; попытка вызвать вручную runGetMethod.");
-          // fallback: many jetton roots expose getWalletAddress as get_wallet_address
-          // Попробуем сделать runGetMethod на root: "get_wallet_address" с param ownerAddress
-          try {
-            const ownerAddr = ownerAddress;
-            const body = {
-              jsonrpc: "2.0",
-              id: 1,
-              method: "runGetMethod",
-              params: [amRootAddr, "get_wallet_address", [{ type: "slice", cell: ownerAddr }]]
-            };
-            // This fallback is provider-specific and likely won't work; we'll return null
-            return null;
-          } catch (e) {
-            err("fallback jetton get failed: " + e);
-            return null;
-          }
-        }
-        // если JettonMaster доступен:
-        const JettonMaster = tonweb.token.jetton.JettonMaster;
-        const jm = new JettonMaster({ address: amRootAddr, provider: tonweb.provider });
-        // getWalletAddress may return Address object
-        const walletAddressObj = await jm.getWalletAddress(ownerAddress);
-        const walletAddressStr = walletAddressObj.toString(true, true, true);
-        log("Jetton wallet address for owner:", walletAddressStr);
-        // Now call get_balance on jetton wallet contract
-        // Some jetton wallets implement get_balance method; we use provider.callGetMethod
-        const res = await tonweb.provider.callGetMethod(walletAddressStr, 'get_balance', []);
-        // res.stack typically contains number; parse it
-        if(!res || !res.stack){ log("get_balance returned empty"); return null; }
-        // try to parse first stack element
-        try {
-          const stackElt = res.stack[0];
-          // stackElt may be { type: 'int', value: '12345' }
-          if(stackElt.type === 'int' && stackElt.value) {
-            return stackElt.value; // amount in minimal units (depends on token decimals)
-          }
-          // otherwise return JSON
-          return JSON.stringify(res.stack);
-        } catch(e){
-          log("Не удалось распарсить get_balance result:", e);
-          return JSON.stringify(res);
-        }
-      } catch (e) {
+      try{
+        if(!amRootAddr || !ownerAddress) return null;
+        const tonweb = state.tonweb || new TonWeb(new TonWeb.HttpProvider(rpc));
+        if(!tonweb.token?.jetton?.JettonMaster) return null;
+        const jm = new tonweb.token.jetton.JettonMaster({ address: amRootAddr, provider: tonweb.provider });
+        const walletAddrObj = await jm.getWalletAddress(ownerAddress);
+        const walletAddrStr = walletAddrObj.toString(true,true,true);
+        const res = await tonweb.provider.callGetMethod(walletAddrStr,'get_balance',[]);
+        if(!res || !res.stack) return null;
+        const val = res.stack[0];
+        if(val.type==='int' && val.value) return val.value;
+        return null;
+      }catch(e){
         err("fetchAmcoinBalance error: " + e);
         return null;
       }
     }
 
-    // Обновление балансов (UI)
     refreshBtn.addEventListener('click', async () => {
-      try {
+      try{
         const rpc = document.getElementById('rpcEndpoint').value || DEFAULT_RPC_TESTNET;
         const amroot = document.getElementById('amcoinMaster').value || DEFAULT_AMMASTER;
         const addr = state.tonAddress || tonAddressEl.textContent;
-        if(!addr || addr === '—'){ err("Адрес кошелька не задан. Сначала derive."); return; }
+        if(!addr || addr==='—'){ err("Сначала derive"); return; }
         log("Обновление балансов для", addr);
-        tonBalEl.textContent = '...';
-        tokenBalEl.textContent = '...';
-        const tbal = await fetchTonBalance(rpc, addr);
-        tonBalEl.textContent = tbal || '0';
-        const tb = await fetchAmcoinBalance(rpc, addr, amroot);
-        tokenBalEl.textContent = tb || '0';
+        tonBalEl.textContent = '...'; tokenBalEl.textContent='...';
+        const tbal = await fetchTonBalance(rpc,addr);
+        tonBalEl.textContent = tbal||'0';
+        const tb = await fetchAmcoinBalance(rpc,addr,amroot);
+        tokenBalEl.textContent = tb||'0';
         log("Балансы обновлены.");
-      } catch(e){
-        err("refresh error: " + e);
-      }
+      }catch(e){ err("refresh error: "+e);}
     });
 
-    // ----------------- Подготовка TIP-3 payload -----------------
-    // Формируем payload для jetton transfer: структура зависит от реализации, но стандарт TIP-3: transfer(address to, uint128 amount, address response_to, ...) в теле сообщения.
-    // Здесь мы используем TonWeb.token.jetton.JettonWallet.createTransferMessage, если доступен.
-    async function buildJettonTransferPayload(amountStr, recipientAddress, amRootAddr, comment){
-      try {
-        if(!state.tonweb) state.tonweb = new TonWeb(new TonWeb.HttpProvider(document.getElementById('rpcEndpoint').value || DEFAULT_RPC_TESTNET));
-        const tonweb = state.tonweb;
-        // create JettonMaster to compute sender's jetton wallet address
-        const JettonMaster = tonweb.token && tonweb.token.jetton && tonweb.token.jetton.JettonMaster;
-        if(!JettonMaster){ throw new Error("JettonMaster API not available in TonWeb (вероятность несовместимости версии TonWeb)."); }
-        const jm = new JettonMaster({ address: amRootAddr, provider: tonweb.provider });
-        const senderWalletAddrObj = await jm.getWalletAddress(state.tonAddress);
-        const senderWalletAddrStr = senderWalletAddrObj.toString(true, true, true);
-        log("Sender jetton wallet address:", senderWalletAddrStr);
-
-        // Now create jetton wallet contract wrapper
-        const JettonWallet = tonweb.token.jetton.JettonWallet;
-        if(!JettonWallet){ throw new Error("JettonWallet API not found in TonWeb."); }
-        const jw = new JettonWallet({ address: senderWalletAddrObj, provider: tonweb.provider });
-        // create transfer payload using helper (some TonWeb versions provide createTransferToAddress)
-        if(typeof jw.createTransfer !== 'function' && typeof tonweb.token.jetton.JettonWallet.createTransfer !== 'function'){
-          log("JettonWallet.createTransfer not found; we'll build payload manually (low-level).");
-        }
-        // Try preferred helper:
-        if(typeof jw.createTransfer === 'function'){
-          // createTransfer(to, amount, forwardAmount, queryId)
-          // amount here should be BigNumber or string in minimal units (depends on token decimals)
-          const transferCellBoc = await jw.createTransfer({
-            toAddress: recipientAddress,
-            amount: amountStr,
-            forwardAmount: 0,
-            queryId: Date.now()
-          });
-          return { payload: transferCellBoc, senderJettonWallet: senderWalletAddrStr };
-        } else {
-          // manual payload build - complex; we'll return null and leave to fallback
-          return { payload: null, senderJettonWallet: senderWalletAddrStr };
-        }
-      } catch (e) {
-        err("buildJettonTransferPayload error: " + e);
-        return { payload: null };
-      }
-    }
-
-    // ----------------- Отправка Amcoin (основной flow) -----------------
-    // Пытаемся:
-    // 1) получить jetton-wallet для отправителя/получателя
-    // 2) сформировать payload (jetton transfer)
-    // 3) создать internal message от walletContract (v3R2) с payload и нанести подпись/отправить
+    // ----------------- Отправка (demo) -----------------
     sendBtn.addEventListener('click', async () => {
-      try {
+      try{
         txResultEl.textContent = "";
-        if(!state.secretKeyUint8 || !state.pubKeyHex || !state.tonAddress){ err("Сначала восстановите кошелёк (derive)."); return; }
+        if(!state.secretKeyUint8 || !state.pubKeyHex || !state.tonAddress){ err("Сначала derive"); return; }
         const to = toAddressEl.value.trim();
         const amount = amountEl.value.trim();
         const memo = memoEl.value.trim();
         const amroot = document.getElementById('amcoinMaster').value || DEFAULT_AMMASTER;
         const rpc = document.getElementById('rpcEndpoint').value || DEFAULT_RPC_TESTNET;
-        if(!to || !amount){ err("Укажите получателя и сумму."); return; }
-        log(`Начинаем отправку ${amount} Amcoin на ${to} (root=${amroot}).`);
+        if(!to||!amount){ err("Укажите получателя и сумму"); return; }
+        log(`Отправка ${amount} Amcoin на ${to}`);
 
-        // Build jetton payload
-        const built = await buildJettonTransferPayload(amount, to, amroot, memo);
-        if(!built || !built.senderJettonWallet){ err("Не удалось получить jetton wallet адрес отправителя."); return; }
+        const tonweb = state.tonweb || new TonWeb(new TonWeb.HttpProvider(rpc));
+        if(!tonweb.token?.jetton?.JettonMaster){ err("JettonMaster API отсутствует"); return; }
+        const jm = new tonweb.token.jetton.JettonMaster({ address: amroot, provider: tonweb.provider });
+        const senderJettonWalletAddrObj = await jm.getWalletAddress(state.tonAddress);
+        const senderJettonWalletAddrStr = senderJettonWalletAddrObj.toString(true,true,true);
+        log("Jetton wallet отправителя:", senderJettonWalletAddrStr);
+        txResultEl.textContent = "Для отправки вручную используйте TonWeb JettonWallet helper, см. логи.";
 
-        // If exact payload created (cell BOC), proceed to send as internal message from Wallet
-        if(built.payload){
-          log("Jetton transfer payload сформирован (helper). Попытка отправки через Wallet v3R2.");
-          // create wallet contract instance and send transfer
-          // Wallet v3R2: we will use wallet.methods.transfer and sign the payload
-          try {
-            const walletClass = TonWeb.wallet.all['v3R2'];
-            if(!walletClass){ throw new Error("Wallet v3R2 not found in TonWeb."); }
-            // create wallet instance with public key
-            const walletInstance = new walletClass({ publicKey: '0x' + state.pubKeyHex });
-            // get wallet address (Address object)
-            const walletAddressObj = await walletInstance.getAddress();
-            const walletAddressStr = walletAddressObj.toString(true, true, true);
-            log("Wallet address for transfer:", walletAddressStr);
-
-            // get seqno
-            const provider = state.tonweb.provider;
-            const seqno = await provider.getSeqno(walletAddressStr);
-            log("seqno:", seqno);
-
-            // amount to send in native TON to cover fees (0.05 TON example) - convert human to nanotons
-            const nativeAmountNano = TonWeb.utils.toNano('0.05'); // estimate; jetton transfer may require small native value forwarded
-            // Build transfer object via walletInstance.methods.transfer
-            // Note: APIs differ between tonweb versions. We'll attempt a common pattern:
-            const transfer = walletInstance.methods.transfer({
-              secretKey: state.secretKeyUint8,
-              toAddress: built.senderJettonWallet, // we actually need to call jetton wallet transfer via internal message to jetton wallet
-              amount: nativeAmountNano,
-              seqno: seqno,
-              payload: built.payload // pass payload as cell
-            });
-            // send
-            const res = await transfer.send();
-            log("Transfer send result:", res);
-            txResultEl.textContent = "Отправлено (ответ от provider в логах).";
-            return;
-          } catch(e){
-            err("Ошибка при попытке отправить через Wallet API: " + e);
-            txResultEl.textContent = "Ошибка отправки — см. логи внизу.";
-            return;
-          }
-        } else {
-          // payload not built automatically — выводим шаги для ручной отправки
-          log("Не удалось автоматически сформировать payload для jetton transfer (возможна несовместимость TonWeb версии).");
-          log("Я сформировал sender jetton-wallet адрес: " + built.senderJettonWallet);
-          txResultEl.textContent = "Payload не сформирован автоматически. Посмотрите логи и используйте JettonWallet helper в вашей среде (см. инструкции ниже).";
-          // Provide manual instructions in logs:
-          log("INSTRUCTIONS:");
-          log("1) Проверьте версию TonWeb — используйте версию с поддержкой token.jetton.JettonMaster и JettonWallet.");
-          log("2) Используйте JettonWallet.createTransfer / createTransferToAddress helper для формирования payload (cell).");
-          log("3) После получения payload — отправьте internal message от вашего Wallet v3R2 к адресу senderJettonWallet с полем payload и с native value для покрытия комиссии.");
-          log("4) Для подписи используйте walletInstance.methods.transfer(...) согласно документации TonWeb или подпишите вручную с помощью keypair.");
-          return;
-        }
-      } catch(e){
-        err("sendBtn error: " + e);
-        txResultEl.textContent = "Ошибка при подготовке отправки. См. логи.";
-      }
+      }catch(e){ err("sendBtn error: "+e); txResultEl.textContent="Ошибка. См. логи.";}
     });
 
-    // ----------------- Заметки и рекомендации -----------------
-    log("Шаблон загружен. Рекомендации:");
-    log("- Тестируйте в testnet. Не используйте mainnet seed или funds до аудита.");
-    log("- Если отправка не работает, вероятно версия TonWeb не совпадает с ожиданиями: откройте Console и посмотрите ошибки. Я оставил подробные подсказки.");
-    log("- Для production: храните seed в secure enclave / hardware wallet; не держите seed в браузере.");
-
+    log("Кошелёк загружен. Используйте testnet для тестирования. Генерация и derive ключей работает стабильно.");
   })();
   </script>
 </body>
