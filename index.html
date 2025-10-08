@@ -83,7 +83,7 @@
   </div>
 
   <!-- Библиотеки -->
-  <script src="https://cdn.jsdelivr.net/npm/bip39@3.0.4/browser.js"></script>
+  <script src="https://unpkg.com/bip39@3.0.4/dist/bip39.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tonweb/dist/tonweb.min.js"></script>
 
@@ -115,11 +115,12 @@
 
     // ----------------- Генерация / очистка -----------------
     genSeedBtn.addEventListener('click', () => {
-      try{
+      try {
+        if(typeof bip39==='undefined') throw new Error("bip39 не загружен");
         const mnemonic = bip39.generateMnemonic(128); // 12 слов
         mnemonicEl.value = mnemonic;
         log("Сгенерирован mnemonic (12 слов).");
-      }catch(e){
+      } catch(e){
         err("Ошибка генерации mnemonic: " + e);
       }
     });
@@ -206,46 +207,4 @@
 
     refreshBtn.addEventListener('click', async () => {
       try{
-        const rpc = document.getElementById('rpcEndpoint').value || DEFAULT_RPC_TESTNET;
-        const amroot = document.getElementById('amcoinMaster').value || DEFAULT_AMMASTER;
-        const addr = state.tonAddress || tonAddressEl.textContent;
-        if(!addr || addr==='—'){ err("Сначала derive"); return; }
-        log("Обновление балансов для", addr);
-        tonBalEl.textContent = '...'; tokenBalEl.textContent='...';
-        const tbal = await fetchTonBalance(rpc,addr);
-        tonBalEl.textContent = tbal||'0';
-        const tb = await fetchAmcoinBalance(rpc,addr,amroot);
-        tokenBalEl.textContent = tb||'0';
-        log("Балансы обновлены.");
-      }catch(e){ err("refresh error: "+e);}
-    });
-
-    // ----------------- Отправка (demo) -----------------
-    sendBtn.addEventListener('click', async () => {
-      try{
-        txResultEl.textContent = "";
-        if(!state.secretKeyUint8 || !state.pubKeyHex || !state.tonAddress){ err("Сначала derive"); return; }
-        const to = toAddressEl.value.trim();
-        const amount = amountEl.value.trim();
-        const memo = memoEl.value.trim();
-        const amroot = document.getElementById('amcoinMaster').value || DEFAULT_AMMASTER;
-        const rpc = document.getElementById('rpcEndpoint').value || DEFAULT_RPC_TESTNET;
-        if(!to||!amount){ err("Укажите получателя и сумму"); return; }
-        log(`Отправка ${amount} Amcoin на ${to}`);
-
-        const tonweb = state.tonweb || new TonWeb(new TonWeb.HttpProvider(rpc));
-        if(!tonweb.token?.jetton?.JettonMaster){ err("JettonMaster API отсутствует"); return; }
-        const jm = new tonweb.token.jetton.JettonMaster({ address: amroot, provider: tonweb.provider });
-        const senderJettonWalletAddrObj = await jm.getWalletAddress(state.tonAddress);
-        const senderJettonWalletAddrStr = senderJettonWalletAddrObj.toString(true,true,true);
-        log("Jetton wallet отправителя:", senderJettonWalletAddrStr);
-        txResultEl.textContent = "Для отправки вручную используйте TonWeb JettonWallet helper, см. логи.";
-
-      }catch(e){ err("sendBtn error: "+e); txResultEl.textContent="Ошибка. См. логи.";}
-    });
-
-    log("Кошелёк загружен. Используйте testnet для тестирования. Генерация и derive ключей работает стабильно.");
-  })();
-  </script>
-</body>
-</html>
+        const rpc = document.getElementById('rpcEndpoint').value
