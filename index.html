@@ -19,167 +19,162 @@
   </style>
 </head>
 <body>
-  <h1>Amcoin Wallet — Testnet (demo)</h1>
-  <p class="small">Демо-кошелёк для токена <strong>Amcoin</strong>. Работает через <code>testnet.toncenter.com</code> и Wallet v3R2. Не используйте реальные seed в этом окне без аудита.</p>
+<h1>Amcoin Wallet — Testnet (demo)</h1>
+<p class="small">Демо-кошелёк для токена <strong>Amcoin</strong>. Работает через <code>testnet.toncenter.com</code> и Wallet v3R2. Не используйте реальные seed в этом окне без аудита.</p>
 
-  <div class="box">
-    <h3>Настройки (можно менять)</h3>
-    <label>RPC endpoint:</label>
-    <input id="rpcEndpoint" value="https://testnet.toncenter.com/api/v2/jsonRPC" />
-    <label>Amcoin (master/root) адрес:</label>
-    <input id="amcoinMaster" value="EQAfysdj5lEz7LfEjybqSe-TFLdC1bMEW5zOvACn2xCjcIKV" />
-    <label>Network:</label>
-    <select id="network">
-      <option value="testnet" selected>testnet</option>
-      <option value="mainnet">mainnet</option>
-    </select>
-    <p class="small">По умолчанию используется Testnet. Если перейдёте в mainnet — будьте максимально осторожны.</p>
+<div class="box">
+  <h3>Настройки (можно менять)</h3>
+  <label>RPC endpoint:</label>
+  <input id="rpcEndpoint" value="https://testnet.toncenter.com/api/v2/jsonRPC" />
+  <label>Amcoin (master/root) адрес:</label>
+  <input id="amcoinMaster" value="EQAfysdj5lEz7LfEjybqSe-TFLdC1bMEW5zOvACn2xCjcIKV" />
+</div>
+
+<div class="box">
+  <h3>Seed / Ключи</h3>
+  <div class="row">
+    <div class="col"><button id="genSeedBtn">Сгенерировать mnemonic (12 слов)</button></div>
+    <div class="col"><button id="clearBtn">Очистить</button></div>
   </div>
-
-  <div class="box">
-    <h3>Seed / Ключи</h3>
-    <div class="row">
-      <div class="col"><button id="genSeedBtn">Сгенерировать mnemonic (12 слов)</button></div>
-      <div class="col"><button id="clearBtn">Очистить</button></div>
-    </div>
-    <label>Mnemonic (seed phrase):</label>
-    <textarea id="mnemonic" rows="2" placeholder="12 слов"></textarea>
-    <label>Пароль (optional, для mnemonic):</label>
-    <input id="mnemonicPass" placeholder="опционально" />
-    <div style="margin-top:8px;">
-      <button id="deriveBtn">Восстановить ключи и адрес (derive)</button>
-    </div>
-    <p class="small">Seed хранится только в памяти текущей сессии. Не отправляйте seed в чат и не сохраняйте в открытом виде.</p>
+  <label>Mnemonic (seed phrase):</label>
+  <textarea id="mnemonic" rows="2" placeholder="12 слов"></textarea>
+  <label>Пароль (optional, для mnemonic):</label>
+  <input id="mnemonicPass" placeholder="опционально" />
+  <div style="margin-top:8px;">
+    <button id="deriveBtn">Восстановить ключи и адрес (derive)</button>
   </div>
+</div>
 
-  <div class="box">
-    <h3>Информация об аккаунте</h3>
-    <p>Public key: <code id="pubkey">—</code></p>
-    <p>TON Wallet address (v3R2): <code id="tonAddress">—</code></p>
-    <p>TON balance (nano): <code id="tonBal">—</code></p>
-    <p>Amcoin balance: <code id="tokenBal">—</code></p>
-    <div style="margin-top:8px;">
-      <button id="refreshBtn">Обновить балансы</button>
-    </div>
+<div class="box">
+  <h3>Информация об аккаунте</h3>
+  <p>Public key: <code id="pubkey">—</code></p>
+  <p>TON Wallet address (v3R2): <code id="tonAddress">—</code></p>
+  <p>TON balance (nano): <code id="tonBal">—</code></p>
+  <p>Amcoin balance: <code id="tokenBal">—</code></p>
+  <div style="margin-top:8px;">
+    <button id="refreshBtn">Обновить балансы</button>
   </div>
+</div>
 
-  <div class="box">
-    <h3>Отправка Amcoin (demo)</h3>
-    <label>Получатель (TON address):</label>
-    <input id="toAddress" placeholder="EQ... или 0:..." />
-    <label>Сумма Amcoin (целые или дробные, в единицах токена):</label>
-    <input id="amount" placeholder="Например 10" />
-    <label>Memo / comment (опционально):</label>
-    <input id="memo" placeholder="memo" />
-    <div style="margin-top:8px;">
-      <button id="sendBtn">Подготовить и отправить Amcoin</button>
-    </div>
-    <p id="txResult" class="small"></p>
-  </div>
+<div class="box">
+  <h3>Логи</h3>
+  <div id="log"></div>
+</div>
 
-  <div class="box">
-    <h3>Логи</h3>
-    <div id="log"></div>
-  </div>
+<!-- Библиотеки -->
+<script src="https://unpkg.com/bip39@3.0.4/browser.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tonweb/dist/tonweb.min.js"></script>
 
-  <!-- Библиотеки -->
-  <script type="module">
-    import * as bip39 from 'https://unpkg.com/bip39@3.0.4/dist/bip39.mjs';
-    window.bip39 = bip39;
-  </script>
-  <script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/tonweb/dist/tonweb.min.js"></script>
+<script>
+(function(){
+const logEl = document.getElementById('log');
+function log(...a){ const t=new Date().toLocaleString(); logEl.textContent += `[${t}] ` + a.join(' ') + "\n"; logEl.scrollTop = logEl.scrollHeight; console.log(...a); }
+function err(msg){ log("ERROR:", msg); console.error(msg); }
 
-  <script>
-  (function(){
-    const logEl = document.getElementById('log');
-    function log(...a){ const t=new Date().toLocaleString(); logEl.textContent += `[${t}] ` + a.join(' ') + "\n"; logEl.scrollTop = logEl.scrollHeight; console.log(...a); }
-    function err(msg){ log("ERROR:", msg); console.error(msg); }
+const genSeedBtn = document.getElementById('genSeedBtn');
+const clearBtn = document.getElementById('clearBtn');
+const deriveBtn = document.getElementById('deriveBtn');
+const mnemonicEl = document.getElementById('mnemonic');
+const passEl = document.getElementById('mnemonicPass');
+const pubkeyEl = document.getElementById('pubkey');
+const tonAddressEl = document.getElementById('tonAddress');
+const tonBalEl = document.getElementById('tonBal');
+const tokenBalEl = document.getElementById('tokenBal');
+const refreshBtn = document.getElementById('refreshBtn');
 
-    const genSeedBtn = document.getElementById('genSeedBtn');
-    const clearBtn = document.getElementById('clearBtn');
-    const deriveBtn = document.getElementById('deriveBtn');
-    const mnemonicEl = document.getElementById('mnemonic');
-    const passEl = document.getElementById('mnemonicPass');
-    const pubkeyEl = document.getElementById('pubkey');
-    const tonAddressEl = document.getElementById('tonAddress');
-    const tonBalEl = document.getElementById('tonBal');
-    const tokenBalEl = document.getElementById('tokenBal');
-    const refreshBtn = document.getElementById('refreshBtn');
-    const sendBtn = document.getElementById('sendBtn');
-    const toAddressEl = document.getElementById('toAddress');
-    const amountEl = document.getElementById('amount');
-    const memoEl = document.getElementById('memo');
-    const txResultEl = document.getElementById('txResult');
+const state = { pubKeyHex:null, secretKeyUint8:null, tonAddress:null, tonweb:null, walletContract:null };
+const DEFAULT_RPC_TESTNET = "https://testnet.toncenter.com/api/v2/jsonRPC";
+const DEFAULT_AMMASTER = document.getElementById('amcoinMaster').value;
 
-    const state = { pubKeyHex:null, secretKeyUint8:null, tonAddress:null, tonweb:null, walletContract:null };
-    const DEFAULT_RPC_TESTNET = "https://testnet.toncenter.com/api/v2/jsonRPC";
-    const DEFAULT_AMMASTER = document.getElementById('amcoinMaster').value;
+// ----------------- Генерация / очистка -----------------
+genSeedBtn.addEventListener('click', () => {
+  try {
+    const mnemonic = bip39.generateMnemonic(128);
+    mnemonicEl.value = mnemonic;
+    log("Сгенерирован mnemonic (12 слов).");
+  } catch(e){ err("Ошибка генерации mnemonic: " + e); }
+});
 
-    // ----------------- Генерация / очистка -----------------
-    genSeedBtn.addEventListener('click', () => {
-      try {
-        const mnemonic = window.bip39.generateMnemonic(128);
-        mnemonicEl.value = mnemonic;
-        log("Сгенерирован mnemonic (12 слов).");
-      } catch(e){
-        err("Ошибка генерации mnemonic: " + e);
-      }
-    });
+clearBtn.addEventListener('click', () => {
+  mnemonicEl.value = "";
+  passEl.value = "";
+  pubkeyEl.textContent = "—";
+  tonAddressEl.textContent = "—";
+  tonBalEl.textContent = "—";
+  tokenBalEl.textContent = "—";
+  state.pubKeyHex = null;
+  state.secretKeyUint8 = null;
+  state.tonAddress = null;
+  state.walletContract = null;
+  log("Очищено. Ключи удалены из памяти.");
+});
 
-    clearBtn.addEventListener('click', () => {
-      mnemonicEl.value = "";
-      passEl.value = "";
-      pubkeyEl.textContent = "—";
-      tonAddressEl.textContent = "—";
-      tonBalEl.textContent = "—";
-      tokenBalEl.textContent = "—";
-      state.pubKeyHex = null;
-      state.secretKeyUint8 = null;
-      state.tonAddress = null;
-      state.walletContract = null;
-      log("Очищено. Ключи удалены из памяти.");
-    });
+// ----------------- Derive ключей -----------------
+deriveBtn.addEventListener('click', async () => {
+  try{
+    const mnemonic = mnemonicEl.value.trim();
+    if(!mnemonic){ err("mnemonic пустой"); return; }
+    const pass = passEl.value || "";
+    const seedBig = bip39.mnemonicToSeedSync(mnemonic, pass);
+    const seed32 = seedBig.slice(0,32);
+    const keyPair = nacl.sign.keyPair.fromSeed(new Uint8Array(seed32));
+    const pubHex = Buffer.from(keyPair.publicKey).toString('hex');
+    state.pubKeyHex = pubHex;
+    state.secretKeyUint8 = keyPair.secretKey;
+    pubkeyEl.textContent = pubHex;
+    log("Ключи получены (ed25519). publicKey hex:", pubHex);
 
-    // ----------------- Derive ключей -----------------
-    deriveBtn.addEventListener('click', async () => {
-      try{
-        const mnemonic = mnemonicEl.value.trim();
-        if(!mnemonic){ err("mnemonic пустой"); return; }
-        const pass = passEl.value || "";
-        const seedBig = window.bip39.mnemonicToSeedSync(mnemonic, pass);
-        const seed32 = seedBig.slice(0,32);
-        const keyPair = nacl.sign.keyPair.fromSeed(new Uint8Array(seed32));
-        const pubHex = Buffer.from(keyPair.publicKey).toString('hex');
-        state.pubKeyHex = pubHex;
-        state.secretKeyUint8 = keyPair.secretKey;
-        pubkeyEl.textContent = pubHex;
-        log("Ключи получены (ed25519). publicKey hex:", pubHex);
+    const rpc = document.getElementById('rpcEndpoint').value || DEFAULT_RPC_TESTNET;
+    state.tonweb = new TonWeb(new TonWeb.HttpProvider(rpc));
+    log("TonWeb инициализирован с RPC:", rpc);
 
-        const rpc = document.getElementById('rpcEndpoint').value || DEFAULT_RPC_TESTNET;
-        state.tonweb = new TonWeb(new TonWeb.HttpProvider(rpc));
-        log("TonWeb инициализирован с RPC:", rpc);
+    const WalletClass = TonWeb.wallet.all['v3R2'];
+    if(!WalletClass){ err("Wallet v3R2 не найден"); return; }
+    const wallet = new WalletClass({ publicKey:'0x'+pubHex });
+    const addrObj = await wallet.getAddress();
+    const addrStr = addrObj.toString(true,true,true);
+    state.tonAddress = addrStr;
+    state.walletContract = wallet;
+    tonAddressEl.textContent = addrStr;
+    log("Wallet v3R2 адрес:", addrStr);
+  }catch(e){ err("derive error: " + e); }
+});
 
-        const WalletClass = TonWeb.wallet.all['v3R2'];
-        if(!WalletClass){ err("Wallet v3R2 не найден"); return; }
-        const wallet = new WalletClass({ publicKey:'0x'+pubHex });
-        const addrObj = await wallet.getAddress();
-        const addrStr = addrObj.toString(true,true,true);
-        state.tonAddress = addrStr;
-        state.walletContract = wallet;
-        tonAddressEl.textContent = addrStr;
-        log("Wallet v3R2 адрес:", addrStr);
-      }catch(e){
-        err("derive error: " + e);
-      }
-    });
+// ----------------- Обновление балансов -----------------
+async function fetchTonBalance(rpc, address){
+  try{
+    if(!address) return null;
+    const bal = await state.tonweb.provider.getBalance(address);
+    return bal.toString();
+  }catch(e){ err("fetchTonBalance: "+e); return null; }
+}
 
-    // ----------------- Балансы TON и Amcoin -----------------
-    async function fetchTonBalance(rpc, address){
-      try{
-        if(!address) return null;
-        if(!state.tonweb) state.tonweb = new TonWeb(new TonWeb.HttpProvider(rpc));
-        const bal = await state.tonweb.provider.getBalance(address);
-        return (bal && bal.toString)? bal.toString():String(bal||"0");
-      }catch(e){
-        err("fetchTonBalance: " + e);
+async function fetchAmcoinBalance(rpc, ownerAddr, amRoot){
+  try{
+    const jm = new state.tonweb.token.jetton.JettonMaster({ address: amRoot, provider: state.tonweb.provider });
+    const walletAddrObj = await jm.getWalletAddress(ownerAddr);
+    const res = await state.tonweb.provider.callGetMethod(walletAddrObj, 'get_balance', []);
+    if(res && res.stack && res.stack[0] && res.stack[0].type==='int') return res.stack[0].value;
+    return "0";
+  }catch(e){ log("Amcoin balance fetch error: "+e); return "0"; }
+}
+
+refreshBtn.addEventListener('click', async () => {
+  if(!state.tonAddress){ err("Сначала сделайте derive."); return; }
+  const rpc = document.getElementById('rpcEndpoint').value || DEFAULT_RPC_TESTNET;
+  const amRoot = document.getElementById('amcoinMaster').value || DEFAULT_AMMASTER;
+  tonBalEl.textContent = '...';
+  tokenBalEl.textContent = '...';
+  const tbal = await fetchTonBalance(rpc, state.tonAddress);
+  tonBalEl.textContent = tbal || '0';
+  const tb = await fetchAmcoinBalance(rpc, state.tonAddress, amRoot);
+  tokenBalEl.textContent = tb || '0';
+  log("Балансы обновлены.");
+});
+
+log("Кошелёк загружен. Используйте testnet для тестирования.");
+})();
+</script>
+</body>
+</html>
