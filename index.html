@@ -83,7 +83,10 @@
   </div>
 
   <!-- Библиотеки -->
-  <script src="https://unpkg.com/bip39@3.0.4/dist/bip39.min.js"></script>
+  <script type="module">
+    import * as bip39 from 'https://unpkg.com/bip39@3.0.4/dist/bip39.mjs';
+    window.bip39 = bip39;
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tonweb/dist/tonweb.min.js"></script>
 
@@ -109,15 +112,14 @@
     const memoEl = document.getElementById('memo');
     const txResultEl = document.getElementById('txResult');
 
-    const state = { pubKeyHex:null, secretKeyUint8:null, tonAddress:null, tonweb:null, walletContract:null, walletInstance:null };
+    const state = { pubKeyHex:null, secretKeyUint8:null, tonAddress:null, tonweb:null, walletContract:null };
     const DEFAULT_RPC_TESTNET = "https://testnet.toncenter.com/api/v2/jsonRPC";
     const DEFAULT_AMMASTER = document.getElementById('amcoinMaster').value;
 
     // ----------------- Генерация / очистка -----------------
     genSeedBtn.addEventListener('click', () => {
       try {
-        if(typeof bip39==='undefined') throw new Error("bip39 не загружен");
-        const mnemonic = bip39.generateMnemonic(128); // 12 слов
+        const mnemonic = window.bip39.generateMnemonic(128);
         mnemonicEl.value = mnemonic;
         log("Сгенерирован mnemonic (12 слов).");
       } catch(e){
@@ -145,7 +147,7 @@
         const mnemonic = mnemonicEl.value.trim();
         if(!mnemonic){ err("mnemonic пустой"); return; }
         const pass = passEl.value || "";
-        const seedBig = bip39.mnemonicToSeedSync(mnemonic, pass);
+        const seedBig = window.bip39.mnemonicToSeedSync(mnemonic, pass);
         const seed32 = seedBig.slice(0,32);
         const keyPair = nacl.sign.keyPair.fromSeed(new Uint8Array(seed32));
         const pubHex = Buffer.from(keyPair.publicKey).toString('hex');
@@ -155,12 +157,11 @@
         log("Ключи получены (ed25519). publicKey hex:", pubHex);
 
         const rpc = document.getElementById('rpcEndpoint').value || DEFAULT_RPC_TESTNET;
-        const tonweb = new TonWeb(new TonWeb.HttpProvider(rpc));
-        state.tonweb = tonweb;
+        state.tonweb = new TonWeb(new TonWeb.HttpProvider(rpc));
         log("TonWeb инициализирован с RPC:", rpc);
 
         const WalletClass = TonWeb.wallet.all['v3R2'];
-        if(!WalletClass){ err("Wallet v3R2 не найден в TonWeb"); return; }
+        if(!WalletClass){ err("Wallet v3R2 не найден"); return; }
         const wallet = new WalletClass({ publicKey:'0x'+pubHex });
         const addrObj = await wallet.getAddress();
         const addrStr = addrObj.toString(true,true,true);
@@ -173,7 +174,7 @@
       }
     });
 
-    // ----------------- Балансы -----------------
+    // ----------------- Балансы TON и Amcoin -----------------
     async function fetchTonBalance(rpc, address){
       try{
         if(!address) return null;
@@ -182,29 +183,3 @@
         return (bal && bal.toString)? bal.toString():String(bal||"0");
       }catch(e){
         err("fetchTonBalance: " + e);
-        return null;
-      }
-    }
-
-    async function fetchAmcoinBalance(rpc, ownerAddress, amRootAddr){
-      try{
-        if(!amRootAddr || !ownerAddress) return null;
-        const tonweb = state.tonweb || new TonWeb(new TonWeb.HttpProvider(rpc));
-        if(!tonweb.token?.jetton?.JettonMaster) return null;
-        const jm = new tonweb.token.jetton.JettonMaster({ address: amRootAddr, provider: tonweb.provider });
-        const walletAddrObj = await jm.getWalletAddress(ownerAddress);
-        const walletAddrStr = walletAddrObj.toString(true,true,true);
-        const res = await tonweb.provider.callGetMethod(walletAddrStr,'get_balance',[]);
-        if(!res || !res.stack) return null;
-        const val = res.stack[0];
-        if(val.type==='int' && val.value) return val.value;
-        return null;
-      }catch(e){
-        err("fetchAmcoinBalance error: " + e);
-        return null;
-      }
-    }
-
-    refreshBtn.addEventListener('click', async () => {
-      try{
-        const rpc = document.getElementById('rpcEndpoint').value
