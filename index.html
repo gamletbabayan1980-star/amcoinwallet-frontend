@@ -60,7 +60,7 @@ code { background:#f7f7f7; padding:2px 6px; border-radius:4px; }
 <div id="log"></div>
 </div>
 
-<!-- Библиотеки -->
+<!-- библиотеки -->
 <script src="https://cdn.jsdelivr.net/npm/bip39@3.0.4/browser.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/tonweb/dist/tonweb.min.js"></script>
@@ -86,7 +86,7 @@ const state = { pubKeyHex:null, secretKeyUint8:null, tonAddress:null, tonweb:nul
 const DEFAULT_RPC_TESTNET = "https://testnet.toncenter.com/api/v2/jsonRPC";
 const DEFAULT_AMMASTER = document.getElementById('amcoinMaster').value;
 
-// ----------------- Генерация / очистка -----------------
+// генерация / очистка
 genSeedBtn.addEventListener('click', () => {
   try {
     const mnemonic = bip39.generateMnemonic(128);
@@ -109,7 +109,7 @@ clearBtn.addEventListener('click', () => {
   log("Очищено. Ключи удалены из памяти.");
 });
 
-// ----------------- Derive ключей -----------------
+// derive ключей
 deriveBtn.addEventListener('click', async () => {
   try{
     const mnemonic = mnemonicEl.value.trim();
@@ -140,7 +140,7 @@ deriveBtn.addEventListener('click', async () => {
   }catch(e){ err("derive error: " + e); }
 });
 
-// ----------------- Обновление балансов -----------------
+// обновление балансов
 async function fetchTonBalance(rpc, address){
   try{
     if(!address) return null;
