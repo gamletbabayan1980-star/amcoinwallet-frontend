@@ -152,29 +152,6 @@ async function fetchTonBalance(rpc, address){
 
 async function fetchAmcoinBalance(rpc, ownerAddr, amRoot){
   try{
+    if(!state.tonweb.token || !state.tonweb.token.jetton) return "0";
     const jm = new state.tonweb.token.jetton.JettonMaster({ address: amRoot, provider: state.tonweb.provider });
-    const walletAddrObj = await jm.getWalletAddress(ownerAddr);
-    const res = await state.tonweb.provider.callGetMethod(walletAddrObj, 'get_balance', []);
-    if(res && res.stack && res.stack[0] && res.stack[0].type==='int') return res.stack[0].value;
-    return "0";
-  }catch(e){ log("Amcoin balance fetch error: "+e); return "0"; }
-}
-
-refreshBtn.addEventListener('click', async () => {
-  if(!state.tonAddress){ err("Сначала сделайте derive."); return; }
-  const rpc = document.getElementById('rpcEndpoint').value || DEFAULT_RPC_TESTNET;
-  const amRoot = document.getElementById('amcoinMaster').value || DEFAULT_AMMASTER;
-  tonBalEl.textContent = '...';
-  tokenBalEl.textContent = '...';
-  const tbal = await fetchTonBalance(rpc, state.tonAddress);
-  tonBalEl.textContent = tbal || '0';
-  const tb = await fetchAmcoinBalance(rpc, state.tonAddress, amRoot);
-  tokenBalEl.textContent = tb || '0';
-  log("Балансы обновлены.");
-});
-
-log("Кошелёк загружен. Используйте testnet для тестирования.");
-})();
-</script>
-</body>
-</html>
+    const walletAddrObj = await jm.getWallet
