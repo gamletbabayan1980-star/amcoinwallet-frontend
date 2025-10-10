@@ -1,211 +1,184 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="utf-8" />
-<title>Amcoin Wallet — Testnet (demo)</title>
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<style>
-body { font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial; max-width:900px; margin:18px auto; padding:12px; color:#111; }
-h1 { font-size:20px; margin-bottom:6px; }
-.box { border:1px solid #e6e6e6; padding:12px; border-radius:10px; margin-bottom:12px; background:#fff; }
-input, textarea, button, select { font-size:14px; padding:8px; margin:6px 0; width:100%; box-sizing:border-box; border-radius:6px; border:1px solid #ddd; }
-button { cursor:pointer; background:#0b5cff; color:#fff; border:none; }
-.small { font-size:13px; color:#555; }
-code { background:#f7f7f7; padding:2px 6px; border-radius:4px; }
-.row { display:flex; gap:8px; }
-.col { flex:1; }
-#log { white-space:pre-wrap; max-height:240px; overflow:auto; background:#fafafa; padding:8px; border-radius:6px; border:1px solid #eee; font-family: monospace; font-size:13px; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Amcoin Wallet — Mainnet</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/bip39@3.0.4/browser/bip39.min.js"></script>
+  <script src="https://unpkg.com/tonweb@0.0.63/dist/tonweb.js"></script>
+  <style>
+    :root { --bg:#f7f8fa; --text:#111827; }
+    [data-theme='dark'] { --bg:#0d1117; --text:#f6f8fa; }
+    html,body,#root { height:100%; margin:0; }
+    body { background:var(--bg); color:var(--text); font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif; }
+    .container { max-width:900px; margin:0 auto; padding:20px; }
+    .box { background:white; border-radius:12px; padding:16px; margin-bottom:16px; box-shadow:0 6px 18px rgba(0,0,0,0.04); }
+    [data-theme='dark'] .box { background:#071025; box-shadow:none; }
+    button { cursor:pointer; padding:8px 12px; border-radius:8px; border:none; background:#4F46E5; color:white; }
+    button:hover { opacity:0.9; }
+    textarea,input { width:100%; padding:8px; border-radius:8px; border:1px solid #e5e7eb; margin-top:6px; }
+    code { font-family:monospace; }
+  </style>
 </head>
 <body>
-<h1>Amcoin Wallet — Testnet (demo)</h1>
-<p class="small">Демо-кошелёк для токена <strong>Amcoin</strong>. Работает через <code>testnet.toncenter.com</code> и Wallet v3R2. Не используйте реальные seed в этом окне без аудита.</p>
+  <div id="root"></div>
 
-<div class="box">
-<h3>Настройки (можно менять)</h3>
-<label>RPC endpoint:</label>
-<input id="rpcEndpoint" value="https://testnet.toncenter.com/api/v2/jsonRPC" />
-<label>Amcoin (master/root) адрес:</label>
-<input id="amcoinMaster" value="EQAfysdj5lEz7LfEjybqSe-TFLdC1bMEW5zOvACn2xCjcIKV" />
-</div>
+  <script type="text/babel">
 
-<div class="box">
-<h3>Seed / Ключи</h3>
-<div class="row">
-<div class="col"><button id="genSeedBtn">Сгенерировать mnemonic (12 слов)</button></div>
-<div class="col"><button id="clearBtn">Очистить</button></div>
-</div>
-<label>Mnemonic (seed phrase):</label>
-<textarea id="mnemonic" rows="2" placeholder="12 слов"></textarea>
-<label>Пароль (optional, для mnemonic):</label>
-<input id="mnemonicPass" placeholder="опционально" />
-<div style="margin-top:8px;">
-<button id="deriveBtn">Восстановить ключи и адрес (derive)</button>
-</div>
-</div>
+    const { useState, useEffect, useRef } = React;
 
-<div class="box">
-<h3>Информация об аккаунте</h3>
-<p>Public key: <code id="pubkey">—</code></p>
-<p>TON Wallet address (v3R2): <code id="tonAddress">—</code></p>
-<p>TON balance (nano): <code id="tonBal">—</code></p>
-<p>Amcoin balance: <code id="tokenBal">—</code></p>
-<div style="margin-top:8px;">
-<button id="refreshBtn">Обновить балансы</button>
-</div>
-</div>
+    const TONCENTER_URL = "https://toncenter.com/api/v2";
+    const TONCENTER_API_KEY = "";
+    const AMCOIN_MASTER = "EQAfysdj5lEz7LfEjybqSe-TFLdC1bMEW5zOvACn2xCjcIKV";
+    const STORAGE_KEY = "amcoin:encSeed";
 
-<div class="box">
-<h3>Отправка Amcoin (demo)</h3>
-<label>Получатель (TON address):</label>
-<input id="toAddress" placeholder="EQ... или 0:..." />
-<label>Сумма Amcoin (целые или дробные, в единицах токена):</label>
-<input id="amount" placeholder="Например 10" />
-<div style="margin-top:8px;">
-<button id="sendBtn">Отправить Amcoin</button>
-</div>
-</div>
+    const arrayBufferToHex = (buffer) =>
+      Array.from(new Uint8Array(buffer)).map(b=>b.toString(16).padStart(2,"0")).join("");
+    const hexToArrayBuffer = (hex) => {
+      if (!hex) return new Uint8Array([]);
+      const bytes = new Uint8Array(hex.length/2);
+      for (let i=0;i<bytes.length;i++) bytes[i]=parseInt(hex.substr(i*2,2),16);
+      return bytes;
+    };
 
-<div class="box">
-<h3>Логи</h3>
-<div id="log"></div>
-</div>
+    function App() {
+      const [theme,setTheme]=useState(localStorage.getItem("amcoin:theme")||"light");
+      const [mnemonic,setMnemonic]=useState("");
+      const [password,setPassword]=useState("");
+      const [address,setAddress]=useState("—");
+      const [tonBalance,setTonBalance]=useState("—");
+      const [amcoinBalance,setAmcoinBalance]=useState("—");
+      const [log,setLog]=useState([]);
+      const logRef=useRef(null);
+      const [isLoading,setIsLoading]=useState(false);
 
-<!-- библиотеки -->
-<script src="https://cdn.jsdelivr.net/npm/bip39@3.0.4/browser.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/tonweb/dist/tonweb.min.js"></script>
+      useEffect(()=>{document.documentElement.setAttribute("data-theme",theme);localStorage.setItem("amcoin:theme",theme);},[theme]);
+      useEffect(()=>{if(logRef.current)logRef.current.scrollTop=logRef.current.scrollHeight;},[log]);
+      const pushLog=(...parts)=>setLog(prev=>[...prev,`[${new Date().toLocaleTimeString()}] ${parts.join(" ")}`].slice(-300));
 
-<script>
-(async function(){
-const logEl = document.getElementById('log');
-function log(...a){ const t=new Date().toLocaleString(); logEl.textContent += `[${t}] ` + a.join(' ') + "\n"; logEl.scrollTop = logEl.scrollHeight; console.log(...a); }
-function err(msg){ log("ERROR:", msg); console.error(msg); }
+      async function handleGenerateMnemonic(){
+        try{const m=bip39.generateMnemonic();setMnemonic(m);pushLog("mnemonic сгенерирован");}catch(e){pushLog("Ошибка:",e.message);}
+      }
+      async function saveEncryptedSeed(){
+        if(!mnemonic||!password){pushLog("mnemonic и пароль обязательны");return;}
+        try{
+          const enc=new TextEncoder();
+          const salt=crypto.getRandomValues(new Uint8Array(16));
+          const iv=crypto.getRandomValues(new Uint8Array(12));
+          const baseKey=await crypto.subtle.importKey("raw",enc.encode(password),{name:"PBKDF2"},false,["deriveKey"]);
+          const key=await crypto.subtle.deriveKey({name:"PBKDF2",salt,iterations:200000,hash:"SHA-256"},baseKey,{name:"AES-GCM",length:256},false,["encrypt","decrypt"]);
+          const ciphertext=await crypto.subtle.encrypt({name:"AES-GCM",iv},key,enc.encode(mnemonic));
+          localStorage.setItem(STORAGE_KEY,JSON.stringify({salt:arrayBufferToHex(salt),iv:arrayBufferToHex(iv),data:arrayBufferToHex(ciphertext)}));
+          pushLog("mnemonic зашифрован и сохранён");
+        }catch(e){pushLog("Ошибка шифрования:",e.message);}
+      }
+      async function loadEncryptedSeed(){
+        try{
+          const raw=localStorage.getItem(STORAGE_KEY);
+          if(!raw){pushLog("Seed не найден");return;}
+          const encObj=JSON.parse(raw);
+          const enc=new TextEncoder();
+          const salt=hexToArrayBuffer(encObj.salt), iv=hexToArrayBuffer(encObj.iv), data=hexToArrayBuffer(encObj.data);
+          const baseKey=await crypto.subtle.importKey("raw",enc.encode(password),{name:"PBKDF2"},false,["deriveKey"]);
+          const key=await crypto.subtle.deriveKey({name:"PBKDF2",salt,iterations:200000,hash:"SHA-256"},baseKey,{name:"AES-GCM",length:256},false,["encrypt","decrypt"]);
+          const plain=await crypto.subtle.decrypt({name:"AES-GCM",iv},key,data);
+          setMnemonic(new TextDecoder().decode(plain));
+          pushLog("mnemonic расшифрован");
+        }catch(e){pushLog("Ошибка расшифровки:",e.message);}
+      }
 
-const genSeedBtn = document.getElementById('genSeedBtn');
-const clearBtn = document.getElementById('clearBtn');
-const deriveBtn = document.getElementById('deriveBtn');
-const mnemonicEl = document.getElementById('mnemonic');
-const passEl = document.getElementById('mnemonicPass');
-const pubkeyEl = document.getElementById('pubkey');
-const tonAddressEl = document.getElementById('tonAddress');
-const tonBalEl = document.getElementById('tonBal');
-const tokenBalEl = document.getElementById('tokenBal');
-const refreshBtn = document.getElementById('refreshBtn');
-const sendBtn = document.getElementById('sendBtn');
-const toAddressEl = document.getElementById('toAddress');
-const amountEl = document.getElementById('amount');
+      async function deriveAddress(){
+        if(!mnemonic){pushLog("Нет mnemonic");return;}
+        setIsLoading(true);
+        try{
+          const seed=await bip39.mnemonicToSeed(mnemonic);
+          const tonweb=new TonWeb(new TonWeb.HttpProvider(`${TONCENTER_URL}/jsonRPC`));
+          const keyPair=TonWeb.utils.keyPairFromSeed(seed.slice(0,32));
+          const wallet=new tonweb.wallet.all.v3R2(tonweb.provider,{publicKey:keyPair.publicKey});
+          const addr=await wallet.getAddress();
+          const addrStr=addr.toString(true,true,true);
+          setAddress(addrStr);
+          pushLog("Адрес получен:",addrStr);
+        }catch(e){pushLog("Ошибка:",e.message);}finally{setIsLoading(false);}
+      }
 
-const state = { pubKeyHex:null, secretKeyUint8:null, tonAddress:null, tonweb:null, walletContract:null };
-const DEFAULT_RPC_TESTNET = "https://testnet.toncenter.com/api/v2/jsonRPC";
-const DEFAULT_AMMASTER = document.getElementById('amcoinMaster').value;
+      async function fetchTonBalance(addr){
+        try{
+          const url=`${TONCENTER_URL}/getAddressInformation?address=${encodeURIComponent(addr)}${TONCENTER_API_KEY?`&api_key=${TONCENTER_API_KEY}`:""}`;
+          const res=await fetch(url);const j=await res.json();
+          return j.ok&&j.result?j.result.balance||0:0;
+        }catch(e){pushLog("Ошибка TON баланса:",e.message);return 0;}
+      }
 
-// генерация / очистка
-genSeedBtn.addEventListener('click', () => {
-  try {
-    const mnemonic = bip39.generateMnemonic(128);
-    mnemonicEl.value = mnemonic;
-    log("Сгенерирован mnemonic (12 слов).");
-  } catch(e){ err("Ошибка генерации mnemonic: " + e); }
-});
+      async function fetchAmcoinBalance(addr){
+        try{
+          const tonweb=new TonWeb(new TonWeb.HttpProvider(`${TONCENTER_URL}/jsonRPC`));
+          const jettonWalletAddr=await tonweb.jetton.getWalletAddress(AMCOIN_MASTER,addr);
+          pushLog("AMCOIN wallet addr:",jettonWalletAddr.toString());
+          const url=`${TONCENTER_URL}/getAddressInformation?address=${encodeURIComponent(jettonWalletAddr.toString())}${TONCENTER_API_KEY?`&api_key=${TONCENTER_API_KEY}`:""}`;
+          const res=await fetch(url);const j=await res.json();
+          return j.ok&&j.result?j.result.balance||0:0;
+        }catch(e){pushLog("Ошибка AMCOIN:",e.message);return 0;}
+      }
 
-clearBtn.addEventListener('click', () => {
-  mnemonicEl.value = "";
-  passEl.value = "";
-  pubkeyEl.textContent = "—";
-  tonAddressEl.textContent = "—";
-  tonBalEl.textContent = "—";
-  tokenBalEl.textContent = "—";
-  state.pubKeyHex = null;
-  state.secretKeyUint8 = null;
-  state.tonAddress = null;
-  state.walletContract = null;
-  log("Очищено. Ключи удалены из памяти.");
-});
+      async function handleCheckBalances(){
+        if(address==="—"){pushLog("Сначала получить адрес");return;}
+        setIsLoading(true);setTonBalance("...");setAmcoinBalance("...");
+        try{
+          const t=await fetchTonBalance(address);
+          setTonBalance(`${t} nanoTON`);
+          const a=await fetchAmcoinBalance(address);
+          setAmcoinBalance(a);
+          pushLog("Балансы обновлены");
+        }catch(e){pushLog("Ошибка балансов:",e.message);}finally{setIsLoading(false);}
+      }
 
-// derive ключей
-deriveBtn.addEventListener('click', async () => {
-  try{
-    const mnemonic = mnemonicEl.value.trim();
-    if(!mnemonic){ err("mnemonic пустой"); return; }
-    const pass = passEl.value || "";
-    const seedBig = bip39.mnemonicToSeedSync(mnemonic, pass);
-    const seed32 = seedBig.slice(0,32);
-    const keyPair = nacl.sign.keyPair.fromSeed(new Uint8Array(seed32));
-    const pubHex = Buffer.from(keyPair.publicKey).toString('hex');
-    state.pubKeyHex = pubHex;
-    state.secretKeyUint8 = keyPair.secretKey;
-    pubkeyEl.textContent = pubHex;
-    log("Ключи получены (ed25519). publicKey hex:", pubHex);
+      return (
+        <div className="container">
+          <h1>💎 Amcoin Wallet — Mainnet</h1>
 
-    const rpc = document.getElementById('rpcEndpoint').value || DEFAULT_RPC_TESTNET;
-    state.tonweb = new TonWeb(new TonWeb.HttpProvider(rpc));
-    log("TonWeb инициализирован с RPC:", rpc);
+          <div className="box">
+            <h3>⚙️ Настройки</h3>
+            <div>TonCenter: mainnet ({TONCENTER_API_KEY?"API key set":"no API key"})</div>
+            <button onClick={()=>setTheme(t=>t==="light"?"dark":"light")}>Тема: {theme==="light"?"🌞 Светлая":"🌙 Тёмная"}</button>
+          </div>
 
-    const WalletClass = TonWeb.wallet.all['v3R2'];
-    if(!WalletClass){ err("Wallet v3R2 не найден"); return; }
-    const wallet = new WalletClass({ publicKey:'0x'+pubHex });
-    const addrObj = await wallet.getAddress();
-    const addrStr = addrObj.toString(true,true,true);
-    state.tonAddress = addrStr;
-    state.walletContract = wallet;
-    tonAddressEl.textContent = addrStr;
-    log("Wallet v3R2 адрес:", addrStr);
-  }catch(e){ err("derive error: " + e); }
-});
+          <div className="box">
+            <h3>🔑 Seed / Ключи</h3>
+            <button onClick={handleGenerateMnemonic}>Сгенерировать mnemonic</button>
+            <button onClick={saveEncryptedSeed}>Зашифровать и сохранить</button>
+            <button onClick={loadEncryptedSeed}>Загрузить зашифрованный</button>
+            <textarea rows={2} value={mnemonic} onChange={e=>setMnemonic(e.target.value)} placeholder="mnemonic" />
+            <input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Пароль" />
+            <button onClick={deriveAddress}>Получить адрес</button>
+          </div>
 
-// обновление балансов
-async function fetchTonBalance(address){
-  try{ return (await state.tonweb.provider.getBalance(address)).toString(); }
-  catch(e){ err("fetchTonBalance: "+e); return null; }
-}
+          <div className="box">
+            <h3>📊 Аккаунт</h3>
+            <div>Address: <code style={{wordBreak:"break-all"}}>{address}</code></div>
+            <div style={{display:"flex",gap:8,marginTop:8}}>
+              <div style={{flex:1,padding:12,borderRadius:8,background:"#f3f4f6"}}>TON: <strong>{tonBalance}</strong></div>
+              <div style={{flex:1,padding:12,borderRadius:8,background:"#f3f4f6"}}>AMCOIN: <strong>{amcoinBalance}</strong></div>
+            </div>
+            <button style={{marginTop:12}} onClick={handleCheckBalances}>Проверить балансы</button>
+          </div>
 
-async function fetchAmcoinBalance(ownerAddr, amRoot){
-  try{
-    const jm = new state.tonweb.token.jetton.JettonMaster({ address: amRoot, provider: state.tonweb.provider });
-    const walletAddrObj = await jm.getWalletAddress(ownerAddr);
-    const res = await state.tonweb.provider.callGetMethod(walletAddrObj, 'get_balance', []);
-    if(res && res.stack && res.stack[0] && res.stack[0].type==='int') return res.stack[0].value;
-    return "0";
-  }catch(e){ log("Amcoin balance fetch error: "+e); return "0"; }
-}
+          <div className="box">
+            <h3>📋 Логи</h3>
+            <div ref={logRef} style={{maxHeight:200,overflow:"auto",padding:12,background:"#fff",borderRadius:8}}>
+              {log.length===0?<div style={{color:"#777"}}>Логи появятся здесь...</div>:log.map((l,i)=><div key={i}>{l}</div>)}
+            </div>
+          </div>
+        </div>
+      );
+    }
 
-refreshBtn.addEventListener('click', async () => {
-  if(!state.tonAddress){ err("Сначала сделайте derive."); return; }
-  const amRoot = document.getElementById('amcoinMaster').value || DEFAULT_AMMASTER;
-  tonBalEl.textContent = '...'; tokenBalEl.textContent = '...';
-  tonBalEl.textContent = await fetchTonBalance(state.tonAddress);
-  tokenBalEl.textContent = await fetchAmcoinBalance(state.tonAddress, amRoot);
-  log("Балансы обновлены.");
-});
+    const root=ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App/>);
 
-// отправка Amcoin
-sendBtn.addEventListener('click', async () => {
-  try{
-    if(!state.secretKeyUint8 || !state.pubKeyHex || !state.tonAddress){ err("Сначала сделайте derive."); return; }
-    const to = toAddressEl.value.trim();
-    const amount = amountEl.value.trim();
-    const amRoot = document.getElementById('amcoinMaster').value || DEFAULT_AMMASTER;
-    if(!to || !amount){ err("Укажите получателя и сумму."); return; }
-    log(`Отправка ${amount} Amcoin на ${to}...`);
-
-    const jm = new state.tonweb.token.jetton.JettonMaster({ address: amRoot, provider: state.tonweb.provider });
-    const senderWalletObj = await jm.getWalletAddress(state.tonAddress);
-    const jw = new state.tonweb.token.jetton.JettonWallet({ address: senderWalletObj, provider: state.tonweb.provider });
-    const transferPayload = await jw.createTransfer({ toAddress: to, amount: amount, forwardAmount: 0, queryId: Date.now() });
-
-    const walletInstance = new TonWeb.wallet.all['v3R2']({ publicKey:'0x'+state.pubKeyHex });
-    const walletAddr = (await walletInstance.getAddress()).toString(true,true,true);
-    const seqno = await state.tonweb.provider.getSeqno(walletAddr);
-    const nativeAmountNano = TonWeb.utils.toNano('0.05');
-
-    await walletInstance.methods.transfer({ secretKey: state.secretKeyUint8, toAddress: senderWalletObj.toString(true,true,true), amount:nativeAmountNano, seqno, payload: transferPayload }).send();
-    log("Отправлено успешно.");
-  }catch(e){ err("send error: "+e); }
-});
-
-log("Кошелёк загружен. Используйте Testnet для тестирования.");
-})();
-</script>
+  </script>
 </body>
 </html>
